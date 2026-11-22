@@ -1,73 +1,88 @@
 # TorqSmash Growth MCP
 
-A starter Remote MCP server for a USA-focused BeamNG.drive gameplay channel. It exposes 8 tools over stateless Streamable HTTP at `/mcp`.
+Remote Model Context Protocol server for USA-focused BeamNG.drive content planning and public YouTube research for the TorqSmash channel.
 
-## What it does
+## Tools
 
-- `generate_seo_package`: SEO brief and writing rules for a video.
-- `generate_titles`: title-generation instructions and scoring criteria.
-- `research_keywords`: live US YouTube result samples for search phrases.
-- `analyze_competitors`: public competitor video samples and analysis guidance.
-- `analyze_video_brief`: retention/editing review from text notes supplied by the user.
-- `generate_shorts_hooks`: opening hooks and captions.
-- `generate_thumbnail_text`: short cover-text ideas.
-- `analyze_channel_public`: public channel lookup guidance.
+- `generate_titles` — title-writing brief and scoring criteria.
+- `generate_description` — description-writing brief.
+- `research_keywords` — public US-region YouTube video examples for keyword exploration.
+- `analyze_competitors` — public video examples and comparison guidance.
+- `analyze_video` — review text descriptions and timestamp notes.
+- `generate_hooks` — opening hooks and on-screen captions.
+- `generate_thumbnail_text` — short thumbnail text ideas.
+- `analyze_channel` — public channel details.
 
-Claude is the language model that turns the returned structured briefs into final copy. This server does not itself generate AI text or inspect uploaded video pixels. YouTube Data API does not expose monthly keyword volume. Private Studio analytics need a separate Google OAuth integration and YouTube Analytics API implementation.
+## Honest capability boundaries
+
+- Claude composes final titles, descriptions, hooks and strategic analysis from the tool results. These tools do not claim an AI model is embedded in the MCP server.
+- YouTube Data API public search and channel lookup require `YOUTUBE_API_KEY`.
+- YouTube Data API does not provide monthly keyword search volume or keyword difficulty.
+- `analyze_video` reviews text supplied by the user; it does not decode video uploads, inspect frames or process audio.
+- Public channel statistics are not private YouTube Studio analytics. Private impressions, CTR and retention require a separate Google OAuth flow and YouTube Analytics API implementation; that is not included in this release.
+- No tool uploads, publishes, edits or deletes YouTube content.
 
 ## Requirements
 
-- Node.js 20+
-- Public HTTPS hosting on port 443 for Claude Remote MCP
-- `MCP_API_KEY` (long random secret)
-- Optional `YOUTUBE_API_KEY` with YouTube Data API v3 enabled in Google Cloud
+- Node.js 20.11+ (Node 22 recommended)
+- npm 10+
+- `MCP_API_KEY` with at least 32 characters
+- Optional YouTube Data API v3 key
 
-## Run locally
+## Local setup
 
 ```bash
 cp .env.example .env
-# Edit .env and set MCP_API_KEY
+# Edit .env and set MCP_API_KEY (32+ characters)
 npm install
-npm run dev
+npm run check
+npm run build
+npm test
+npm start
 ```
 
-Health check: `http://localhost:3000/health`
-MCP endpoint: `http://localhost:3000/mcp` (local testing only; Claude requires public HTTPS)
+Health endpoint: `http://localhost:3000/health`
+Remote MCP endpoint: `http://localhost:3000/mcp`
 
-## Deploy to Render (simple option)
+For development: `npm run dev`.
 
-1. Put this folder in a private GitHub repository.
-2. In Render, create **New + → Web Service**, connect the repository.
-3. Runtime: Docker (Render detects the Dockerfile).
-4. Add environment variables: `MCP_API_KEY`, optional `YOUTUBE_API_KEY`, and `CHANNEL_NAME=TorqSmash`.
-5. Deploy. Copy the HTTPS service URL, e.g. `https://your-service.onrender.com/mcp`.
-6. Test `https://your-service.onrender.com/health` in a browser. It should return `{"ok":true,...}`.
-7. Do not share the API key or commit `.env` to GitHub.
+## Environment variables
 
-For production, use a paid always-on instance if your host sleeps free services; sleeping services may cause Claude connection timeouts.
+| Variable | Required | Description |
+|---|---|---|
+| `MCP_API_KEY` | Yes | Bearer secret, minimum 32 characters |
+| `YOUTUBE_API_KEY` | No | Public YouTube Data API v3 lookup |
+| `CHANNEL_NAME` | No | Defaults to TorqSmash |
+| `PORT` | No | Defaults to 3000 |
+| `NODE_ENV` | No | Defaults to production |
 
-## Add to Claude
+## GitHub
 
-In Claude, open **Settings → Connectors → Add custom connector** (labels may vary), choose a web/remote connector, name it `TorqSmash AI Growth`, and enter the full HTTPS URL ending in `/mcp`.
+Run `npm install` once in the project folder to generate `package-lock.json`, then commit that generated lockfile. Upload the CONTENTS of this folder to the repository root, not the outer folder as a nested directory. Include `.github/workflows/ci.yml`. Never commit `.env`, API keys, `node_modules` or `dist`.
 
-When Claude asks for authentication, choose the fixed request-header/API-key option if available and configure:
+## Render deployment
 
-- Header name: `Authorization`
-- Header value: `Bearer YOUR_MCP_API_KEY`
+1. Push this project to GitHub.
+2. In Render choose **New → Blueprint** and select the repository.
+3. Render reads `render.yaml` and builds the Docker image.
+4. Set `YOUTUBE_API_KEY` in Render if public YouTube research is required.
+5. Wait for deployment and verify `/health` returns `{"ok":true,...}`.
+6. Set the Claude remote MCP connector URL to `https://YOUR-SERVICE.onrender.com/mcp`.
+7. Configure the fixed request header `Authorization: Bearer YOUR_MCP_API_KEY` if the Claude connector UI supports custom headers. Do not remove server authentication if it does not.
 
-If the UI does not offer custom request headers for your account, use a supported OAuth configuration or add an OAuth layer to this server; do not remove authentication just to make it connect. Claude's current setup screens and supported authentication options can change.
+The included Render blueprint uses a paid Starter plan for always-on availability. Adjust the plan if you understand the limitations of a free/sleeping service.
 
-## Example prompts in Claude
+## MCP transport and authentication
 
-- "Use generate_seo_package for this BeamNG.drive Short: [describe the actual video]."
-- "Use research_keywords for BeamNG.drive canyon jump gameplay, US region. Do not invent search volumes."
-- "Use analyze_competitors for BeamNG.drive crash challenge and summarize repeatable title patterns."
-- "Use analyze_video_brief. Here are my timestamp notes: 0:00 ..."
+This project uses the official MCP TypeScript SDK with Streamable HTTP transport in stateless mode. MCP requests are accepted via POST `/mcp`. Bearer authentication is required. Health check `/health` is intentionally public for hosting health probes.
 
-## Security notes
+## Tests and CI
 
-- Treat this connector as private. Anyone with the URL and bearer key can call its tools.
-- Keep keys in host environment variables, never in source code or screenshots.
-- Rotate the key if it is exposed.
-- This starter is API-key protected, not OAuth. Confirm Claude's current custom-header support in your account before deployment.
-- Do not add write/publish/delete YouTube capabilities without explicit review and confirmation.
+GitHub Actions runs `npm install`, TypeScript checking, production build and Node tests on pushes and pull requests. Run the same commands locally before deployment.
+
+## Security
+
+- Keep `.env` and all tokens private.
+- Rotate the secret immediately if exposed.
+- Do not paste secrets into GitHub issues, screenshots or chat.
+- Keep the YouTube API key restricted in Google Cloud where possible.

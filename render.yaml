@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: torqsmash-growth-mcp
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: MCP_API_KEY
+        generateValue: true
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: CHANNEL_NAME
+        value: TorqSmash
+      - key: NODE_ENV
+        value: production
